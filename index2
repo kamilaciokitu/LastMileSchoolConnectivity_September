@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Global Connectivity Infrastructure Map — ITU BDT / Giga / UNICEF</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    --mono: 'Courier New', Courier, monospace;
+    --backbone: #185FA5; --backbone-light: #E6F1FB; --backbone-mid: #85B7EB;
+    --middle: #0F6E56;   --middle-light: #E1F5EE;   --middle-mid: #5DCAA5;
+    --last: #993C1D;     --last-light: #FAECE7;     --last-mid: #F0997B;
+    --bg: #0d1b2a; --card: #1a2a3a; --text: #f0f4f8; --muted: #8899aa; --border: rgba(255,255,255,0.1);
+  }
+  body { font-family: var(--sans); background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+  header {
+    padding: 12px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    background: rgba(13,27,42,0.95);
+    flex-shrink: 0;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .header-left { display: flex; align-items: center; gap: 14px; }
+  .header-title { font-size: 15px; font-weight: 600; }
+  .header-sub { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+  .logos { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 0.1em; }
+  .logos span { font-weight: 700; color: #aac4dd; }
+
+  /* Legend */
+  .legend {
+    display: flex; gap: 14px; flex-wrap: wrap; align-items: center;
+    padding: 8px 20px;
+    background: rgba(13,27,42,0.9);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); cursor: pointer; user-select: none; transition: opacity 0.2s; }
+  .legend-item.dimmed { opacity: 0.3; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); }
+  .legend-sep { width: 1px; height: 16px; background: var(--border); }
+  .legend-hint { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-left: auto; }
+
+  /* Map container */
+  .map-wrap { flex: 1; position: relative; overflow: hidden; }
+  #map-svg { width: 100%; height: 100%; display: block; }
+
+  /* Points */
+  .point { cursor: pointer; transition: transform 0.15s; transform-origin: center; }
+  .point:hover { transform: scale(1.4); }
+  .point circle.ring { fill: none; stroke-width: 1.5; opacity: 0.5; }
+  .point circle.dot { stroke: rgba(255,255,255,0.4); stroke-width: 1; }
+  .point.backbone circle.ring { stroke: var(--backbone); }
+  .point.backbone circle.dot { fill: var(--backbone); }
+  .point.middle circle.ring { stroke: var(--middle); }
+  .point.middle circle.dot { fill: var(--middle); }
+  .point.last circle.ring { stroke: var(--last); }
+  .point.last circle.dot { fill: var(--last); }
+  .point.active circle.ring { opacity: 1; stroke-width: 2.5; }
+
+  /* Panel */
+  #panel {
+    position: absolute; top: 16px; right: 16px;
+    width: 300px; max-height: calc(100% - 32px);
+    background: rgba(20,34,50,0.97);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow-y: auto;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+    display: none;
+    backdrop-filter: blur(8px);
+  }
+  #panel.open { display: block; }
+  .panel-header { padding: 16px 18px 12px; border-bottom: 1px solid var(--border); position: relative; }
+  .panel-close { position: absolute; top: 14px; right: 14px; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 18px; line-height: 1; padding: 2px 6px; border-radius: 6px; }
+  .panel-close:hover { background: var(--border); color: var(--text); }
+  .panel-layer { font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 6px; }
+  .panel-layer.backbone { color: var(--backbone-mid); }
+  .panel-layer.middle   { color: var(--middle-mid); }
+  .panel-layer.last     { color: var(--last-mid); }
+  .panel-title { font-size: 16px; font-weight: 700; line-height: 1.3; margin-bottom: 4px; }
+  .panel-location { font-size: 12px; color: var(--muted); }
+  .panel-badge { display: inline-block; margin-top: 8px; font-size: 11px; font-family: var(--mono); padding: 3px 8px; border-radius: 5px; font-weight: 600; }
+  .badge-backbone { background: var(--backbone-light); color: var(--backbone); }
+  .badge-middle   { background: var(--middle-light);   color: var(--middle); }
+  .badge-last     { background: var(--last-light);     color: var(--last); }
+
+  .panel-body { padding: 14px 18px; }
+  .prow { margin-bottom: 13px; }
+  .prow:last-child { margin-bottom: 0; }
+  .prow-label { font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+  .prow-value { font-size: 13px; line-height: 1.6; color: var(--text); }
+  .tag-list { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
+  .tag { font-size: 10px; padding: 2px 7px; border-radius: 4px; border: 1px solid var(--border); color: var(--muted); font-family: var(--mono); background: rgba(255,255,255,0.04); }
+  .cost-bar { height: 6px; border-radius: 99px; background: rgba(255,255,255,0.08); margin-top: 6px; overflow: hidden; }
+  .cost-fill { height: 100%; border-radius: 99px; }
+
+  /* Tooltip */
+  #tooltip {
+    position: absolute; pointer-events: none;
+    background: rgba(20,34,50,0.95); border: 1px solid var(--border);
+    border-radius: 8px; padding: 7px 11px;
+    font-size: 12px; color: var(--text);
+    white-space: nowrap; display: none;
+    backdrop-filter: blur(6px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  }
+  #tooltip .tt-layer { font-size: 10px; font-family: var(--mono); color: var(--muted); margin-bottom: 2px; }
+
+  @media (max-width: 600px) {
+    #panel { width: calc(100vw - 32px); top: auto; bottom: 16px; right: 16px; max-height: 55vh; }
+    .legend-hint { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div>
+      <div class="header-title">Global Connectivity Infrastructure Map</div>
+      <div class="header-sub">Scenario analysis · Last mile school connectivity</div>
+    </div>
+  </div>
+  <div class="logos"><span>ITU BDT</span> · <span>ITU Academy</span></div>
+</header>
+
+<div class="legend">
+  <div class="legend-item" data-layer="backbone" onclick="toggleLayer('backbone',this)">
+    <div class="legend-dot" style="background:var(--backbone)"></div> Backbone
+  </div>
+  <div class="legend-item" data-layer="middle" onclick="toggleLayer('middle',this)">
+    <div class="legend-dot" style="background:var(--middle)"></div> Middle mile
+  </div>
+  <div class="legend-item" data-layer="last" onclick="toggleLayer('last',this)">
+    <div class="legend-dot" style="background:var(--last)"></div> Last mile
+  </div>
+  <div class="legend-sep"></div>
+  <div class="legend-hint">Click any point to explore · Click legend to filter</div>
+</div>
+
+<div class="map-wrap">
+  <svg id="map-svg" viewBox="0 0 1000 500" preserveAspectRatio="xMidYMid meet">
+    <!-- World map background paths (simplified Natural Earth) -->
+    <rect width="1000" height="500" fill="#0d1b2a"/>
+    <!-- Ocean grid lines -->
+    <g stroke="rgba(255,255,255,0.04)" stroke-width="0.5">
+      <line x1="0" y1="125" x2="1000" y2="125"/>
+      <line x1="0" y1="250" x2="1000" y2="250"/>
+      <line x1="0" y1="375" x2="1000" y2="375"/>
+      <line x1="250" y1="0" x2="250" y2="500"/>
+      <line x1="500" y1="0" x2="500" y2="500"/>
+      <line x1="750" y1="0" x2="750" y2="500"/>
+    </g>
+    <!-- Equator -->
+    <line x1="0" y1="255" x2="1000" y2="255" stroke="rgba(255,255,255,0.08)" stroke-width="1" stroke-dasharray="4,4"/>
+
+    <!-- Simplified continent fills -->
+    <!-- North America -->
+    <path d="M120,60 L220,55 L250,80 L260,130 L240,170 L210,200 L190,240 L170,260 L150,250 L130,220 L110,180 L100,140 L105,100 Z" fill="#142233" stroke="rgba(255,255,255,0.06)" stroke-width="0.8"/>
+    <!-- Greenland -->
+    <path d="M220,30 L260,25 L270,50 L245,60 L220,55 Z" fill="#142233" stroke="rgba(255,255,255,0.06)" stroke-width="0.5"/>
+    <!-- South America -->
+    <path d="M195,260 L230,255 L250,280 L255,320 L245,370 L225,400 L205,390 L190,350 L185,310 L190,280 Z" fill="#142233" stroke="rgba(255,255,255,0.06)" stroke-width="0.8"/>
+    <!-- Europe -->
+    <path d="M430,60 L490,55 L510,70 L520,100 L500,120 L470,125 L450,115 L435,95 L428,75 Z" fill="#142233" stroke="rgba(255,255,255,0.06)" stroke-width="0.8"/>
+    <!-- Africa -->
+    <path d="M450,145 L510,135 L540,155 L550,200 L545,250 L530,300 L510,340 L490,355 L470,345 L455,300 L445,250 L440,200 Z" fill="#142233" stroke="rgba(255,255,255,0.06)" stroke-width="0.8"/>
+    <!-- Asia -->
+    <path d="M510,55 L700,45 L760,70 L780,110 L760,150 L720,160 L680,155 L640,170 L600,165 L560,150 L530,130 L510,100 Z" fill="#142233" stroke="rgba(255,255,255,0.06)" stroke-width="0.8"/>
+    <!-- Middle East -->
+    <path d="M530,130 L590,125 L610,150 L600,175 L570,180 L545,170 Z" fill="#142233" stroke="rgba(255,255,255,0.06)" stroke-width="0.8"/>
+    <!-- South Asia -->
+    <path d="M620,155 L670,150 L690,170 L685,210 L660,225 L635,215 L615,190 Z" fill="#142233" stroke="rgba(255,255,255,0.06)" stroke-width="0.8"/>
+    <!-- SE Asia -->
+    <path d="M700,160 L740,155 L755,180 L745,205 L720,210 L705,190 Z" fill="#142233" stroke="rgba(255,255,255,0.06)" stroke-width="0.8"/>
+    <!-- East Asia -->
+    <path d="M720,80 L780,75 L810,100 L800,140 L770,155 L740,150 L720,130 Z" fill="#142233" stroke="rgba(255,255,255,0.06)" stroke-width="0.8"/>
+    <!-- Australia -->
+    <path d="M740,300 L820,295 L850,320 L845,360 L810,375 L765,370 L740,345 Z" fill="#142233" stroke="rgba(255,255,255,0.06)" stroke-width="0.8"/>
+    <!-- Japan/Korea -->
+    <path d="M800,100 L825,95 L835,115 L820,130 L805,125 Z" fill="#142233" stroke="rgba(255,255,255,0.06)" stroke-width="0.5"/>
+
+    <!-- Submarine cable lines (backbone) -->
+    <g stroke="var(--backbone)" stroke-width="0.8" opacity="0.25" fill="none" stroke-dasharray="3,4">
+      <!-- Trans-Atlantic -->
+      <path d="M175,150 Q300,130 430,120"/>
+      <!-- Trans-Pacific -->
+      <path d="M175,150 Q400,200 740,170"/>
+      <!-- Europe-Africa -->
+      <path d="M470,115 Q480,200 490,290"/>
+      <!-- Africa-Asia -->
+      <path d="M510,290 Q600,280 660,210"/>
+      <!-- Europe-Asia -->
+      <path d="M500,110 Q600,100 720,110"/>
+      <!-- Pacific crossing -->
+      <path d="M800,120 Q880,150 950,160"/>
+      <!-- South Atlantic -->
+      <path d="M210,350 Q340,340 460,310"/>
+      <!-- Indian Ocean -->
+      <path d="M510,310 Q620,330 740,320"/>
+    </g>
+
+    <!-- Points layer -->
+    <g id="points-layer"></g>
+  </svg>
+
+  <div id="tooltip">
+    <div class="tt-layer" id="tt-layer"></div>
+    <div id="tt-name"></div>
+  </div>
+
+  <div id="panel">
+    <div class="panel-header">
+      <button class="panel-close" onclick="closePanel()">×</button>
+      <div class="panel-layer" id="p-layer"></div>
+      <div class="panel-title" id="p-title"></div>
+      <div class="panel-location" id="p-location"></div>
+      <span class="panel-badge" id="p-badge"></span>
+    </div>
+    <div class="panel-body" id="p-body"></div>
+  </div>
+</div>
+
+<script>
+// lon/lat to SVG x/y (equirectangular, viewBox 0 0 1000 500)
+function proj(lon, lat) {
+  return { x: (lon + 180) / 360 * 1000, y: (90 - lat) / 180 * 500 };
+}
+
+const POINTS = [
+  // ── BACKBONE ──────────────────────────────────────────────
+  {
+    id:"seacom", layer:"backbone", name:"SEACOM Submarine Cable Hub", location:"Mombasa, Kenya",
+    tech:["Submarine fiber cable","14,000 km undersea link","Connects Africa to Europe & Asia","Landing station"],
+    role:"SEACOM is a major submarine cable providing Africa's east coast with high-capacity international bandwidth, connecting Kenya, Tanzania, Mozambique, South Africa, Madagascar to Europe and Asia.",
+    coverage:"East Africa ↔ Europe ↔ Asia", cost:"Very high (CAPEX ~$650M)", costLevel:92,
+    strengths:"High capacity (1.28 Tbps+), low latency for intercontinental links, backbone for national ISPs across East Africa.",
+    limitations:"Single landing points create bottlenecks. Complex to repair. Requires coastal infrastructure.",
+    cases:["National ISP wholesale capacity","Regional internet exchange feeds","Government and enterprise WAN"],
+    lon:39.7, lat:-4.0
+  },
+  {
+    id:"ace", layer:"backbone", name:"ACE Submarine Cable", location:"West Africa Coast",
+    tech:["Submarine fiber cable","17,000 km length","Connects 24 countries","France Télécom led consortium"],
+    role:"Africa Coast to Europe (ACE) cable connects 24 countries from France to South Africa along the West African coast, providing critical backbone for landlocked Sahel countries via landing stations.",
+    coverage:"West Africa ↔ Europe (17,000 km)", cost:"Very high (consortium CAPEX)", costLevel:93,
+    strengths:"Connects 24 nations including many LDCs. Enables affordable bandwidth in West Africa. Redundancy for landlocked countries via terrestrial backhaul.",
+    limitations:"Limited landing stations. Bandwidth expensive for smaller nations. Repair logistics complex.",
+    cases:["West African national ISPs","Backbone for Sahel landlocked countries","International traffic routing"],
+    lon:-17, lat:14.7
+  },
+  {
+    id:"transpacific", layer:"backbone", name:"Trans-Pacific Submarine Cable (FASTER)", location:"Pacific Ocean / Japan",
+    tech:["Submarine fiber cable","FASTER cable consortium","60 Tbps design capacity","Google-led consortium"],
+    role:"FASTER is a 9,000 km trans-Pacific cable connecting Japan to the US West Coast, co-built by Google and telecom partners. One of the highest-capacity transoceanic links.",
+    coverage:"Japan ↔ USA (Pacific crossing)", cost:"Very high (~$300M CAPEX)", costLevel:95,
+    strengths:"Massive capacity (60 Tbps). Low latency trans-Pacific. Supports cloud infrastructure for Asia-Pacific region.",
+    limitations:"Highly concentrated — failure affects millions. Only serves endpoints. Requires terrestrial distribution to reach schools.",
+    cases:["Cloud services backbone","Asia-Pacific internet traffic","International enterprise connectivity"],
+    lon:160, lat:35
+  },
+  {
+    id:"ixp-nairobi", layer:"backbone", name:"KIXP Internet Exchange Point", location:"Nairobi, Kenya",
+    tech:["Internet Exchange Point (IXP)","Keeps local traffic local","Peering fabric","LINX-supported"],
+    role:"Kenya Internet Exchange Point (KIXP) is a neutral peering facility where Kenyan ISPs exchange local traffic domestically, dramatically reducing costs and latency compared to routing traffic internationally.",
+    coverage:"National (Kenya)", cost:"Low OPEX / shared infrastructure", costLevel:30,
+    strengths:"Reduces international bandwidth costs by up to 80% for local traffic. Lowers latency. Builds local internet ecosystem. Critical for affordable school connectivity.",
+    limitations:"Requires ISP participation and governance. Needs reliable power and physical security.",
+    cases:["Local traffic exchange","ISP peering","CDN hosting","Government network interconnect"],
+    lon:36.8, lat:-1.3
+  },
+  {
+    id:"geo-satellite", layer:"backbone", name:"GEO Satellite Backbone (Intelsat)", location:"Geostationary Orbit (36,000 km)",
+    tech:["Geostationary satellite","Intelsat / SES / Eutelsat","36,000 km altitude","VSAT uplinks"],
+    role:"GEO satellites have provided backbone connectivity across Africa, Pacific islands, and remote areas for decades. Expensive and high-latency but offering broad coverage where no fiber exists.",
+    coverage:"Continental / regional beams", cost:"Very high ($1,000–$5,000/month dedicated link)", costLevel:90,
+    strengths:"Broad coverage. No ground infrastructure needed. Proven technology. Suitable for broadcast and non-real-time data.",
+    limitations:"600ms+ latency makes video conferencing and interactive learning difficult. Expensive per Mbps. Being disrupted by LEO constellations.",
+    cases:["Remote backbone links","Broadcasting","Government VSAT networks","Legacy school connectivity"],
+    lon:10, lat:5
+  },
+  // ── MIDDLE MILE ───────────────────────────────────────────
+  {
+    id:"fiber-nigeria", layer:"middle", name:"MainOne Fiber Backhaul Network", location:"Nigeria (Lagos → Abuja → Kano)",
+    tech:["Terrestrial fiber","Metro + long-haul","4,000+ km in Nigeria","DWDM technology"],
+    role:"MainOne operates a terrestrial fiber network connecting Nigerian cities from the submarine cable landing station in Lagos northward, enabling affordable bandwidth distribution to ISPs, schools, and institutions inland.",
+    coverage:"Nigeria — major cities and corridors", cost:"Medium (lease or IRU)", costLevel:55,
+    strengths:"Reaches inland cities. Enables affordable wholesale bandwidth. Reduces dependence on satellite for urban and peri-urban areas.",
+    limitations:"Rural gaps remain large. Right-of-way challenges. Requires significant investment to extend to schools.",
+    cases:["ISP wholesale backhaul","University and hospital connectivity","Urban school broadband"],
+    lon:7.5, lat:9.0
+  },
+  {
+    id:"microwave-rwanda", layer:"middle", name:"RDB Microwave Backhaul Grid", location:"Rwanda (National)",
+    tech:["Licensed microwave links","Point-to-point","Government-owned","Connects 30 districts"],
+    role:"Rwanda's government-built microwave backhaul grid connects all 30 districts to the national fiber ring, enabling last-mile providers and schools to access affordable bandwidth even in hilly terrain.",
+    coverage:"All 30 districts of Rwanda", cost:"Government-subsidized / medium", costLevel:45,
+    strengths:"Near-universal district coverage. Government ownership reduces costs. Enables school connectivity program. Model for small landlocked nations.",
+    limitations:"Capacity limited vs fiber. Line-of-sight challenges in hills. Maintenance requires skilled technicians.",
+    cases:["District ISP backhaul","School connectivity (1,000+ schools connected)","E-government services"],
+    lon:29.9, lat:-1.9
+  },
+  {
+    id:"fiber-india", layer:"middle", name:"BharatNet Fiber Backhaul", location:"India (Rural)",
+    tech:["Optical fiber cable (OFC)","Government of India program","600,000+ km target","Gram Panchayat level"],
+    role:"BharatNet is the world's largest rural broadband program, aiming to connect all 250,000+ Indian gram panchayats (village councils) with fiber optic cable to enable last-mile school and community connectivity.",
+    coverage:"All 250,000 gram panchayats, India", cost:"Government-funded (~$6B)", costLevel:60,
+    strengths:"Massive scale. Reaches village level. Enables state governments to build last-mile solutions. Feeds school connectivity initiatives.",
+    limitations:"Implementation delays. Last-mile still requires WiFi or cellular from fiber endpoint. Maintenance capacity gaps in rural areas.",
+    cases:["Village-level broadband","School connectivity","Telemedicine","Digital literacy centers"],
+    lon:80, lat:22
+  },
+  {
+    id:"fiber-brazil", layer:"middle", name:"PNBL Nacional Fiber Backbone", location:"Brazil (Amazon region)",
+    tech:["Terrestrial fiber","Eletronet / Anatel regulated","Amazon river corridor","Government + private"],
+    role:"Brazil's national broadband program extended fiber backbone through the Amazon region using river corridors, connecting previously isolated municipalities to the national internet infrastructure.",
+    coverage:"Amazon states + urban corridors", cost:"Public-private partnership", costLevel:58,
+    strengths:"Opened Amazon region to affordable bandwidth. Feeds municipal ISPs. Enables PNLD digital education content delivery.",
+    limitations:"Extreme terrain. High cost in Amazon. Last mile still challenging for riverine and forest communities.",
+    cases:["Amazon municipality backhaul","Indigenous community feeds","School digital content delivery"],
+    lon:-60, lat:-3
+  },
+  {
+    id:"microwave-pacific", layer:"middle", name:"Pacific Regional Microwave Links", location:"Pacific Islands (Fiji hub)",
+    tech:["Point-to-point microwave","Inter-island links","PERC network","Solar-powered nodes"],
+    role:"Pacific island nations use microwave links to connect outer islands to the main submarine cable landing points, enabling middle-mile connectivity where inter-island fiber is uneconomic.",
+    coverage:"Pacific island groups", cost:"Medium (shared regional cost)", costLevel:48,
+    strengths:"Bridges submarine cable to outer islands. No submarine cable needed between islands. Solar power enables off-grid nodes.",
+    limitations:"Capacity limited. Weather events (cyclones) can disrupt. Requires regular maintenance with scarce local expertise.",
+    cases:["Outer island ISP feeds","School connectivity in outer islands","Government services"],
+    lon:178, lat:-17.5
+  },
+  // ── LAST MILE ─────────────────────────────────────────────
+  {
+    id:"starlink-kenya", layer:"last", name:"Starlink LEO Satellite (School)", location:"Turkana County, Kenya",
+    tech:["Starlink LEO constellation","~$120/mo residential / $500 business","50–250 Mbps","20–40ms latency"],
+    role:"Starlink LEO satellite connectivity has been deployed in remote Kenyan schools in counties like Turkana where no fiber or reliable mobile coverage exists, delivering broadband-grade speeds directly to classrooms.",
+    coverage:"Remote school / community", cost:"~$500/month (business) + $600 hardware", costLevel:48,
+    strengths:"Works anywhere with open sky. 50–250 Mbps — suitable for video, LMS, videoconferencing. Rapid deployment. Transformative for remote schools.",
+    limitations:"Subscription cost challenging for public schools without subsidy. Requires reliable electricity. Signal blocked by terrain in valleys.",
+    cases:["Remote school digital learning","Teacher videoconferencing","Community internet access point"],
+    lon:35.5, lat:3.5
+  },
+  {
+    id:"wifi-colombia", layer:"last", name:"Zonas WiFi Gratis (Free WiFi Zones)", location:"Colombia (Rural municipalities)",
+    tech:["Wi-Fi 802.11ac hotspots","Ministry of ICT program","Fiber or microwave backhaul","Public access points"],
+    role:"Colombia's Zonas WiFi program deployed 10,000+ free public WiFi hotspots in rural municipalities, schools, and libraries, providing last-mile access to communities previously offline.",
+    coverage:"10,000+ rural municipalities", cost:"Government-subsidized (low for users)", costLevel:20,
+    strengths:"Free at point of use. High adoption. Schools and community centers prioritized. Digital literacy programs integrated.",
+    limitations:"Backhaul quality varies. Outdoor hotspots vulnerable to weather. Limited indoor penetration. Speed shared across users.",
+    cases:["Community free internet access","School outdoor connectivity","Digital literacy programs","Government service access"],
+    lon:-74.5, lat:4.7
+  },
+  {
+    id:"4g-ghana", layer:"last", name:"MTN 4G School Connectivity", location:"Ghana (Ashanti & Greater Accra)",
+    tech:["4G LTE cellular","Fixed Wireless Access (FWA) router","MTN Ghana network","SIM-based school connection"],
+    role:"MTN Ghana and government programs use 4G FWA routers to connect schools within mobile coverage areas, providing a fast, low-cost alternative to fiber where tower infrastructure already exists.",
+    coverage:"Schools within 4G coverage area (~70% of Ghana population)", cost:"Low–medium (~$50–150/month)", costLevel:35,
+    strengths:"Leverages existing tower infrastructure. Quick to deploy — router + SIM. No civil works. Scalable as coverage expands.",
+    limitations:"Speed and reliability vary with distance to tower and congestion. Data costs can accumulate. Gaps in rural Northern Ghana.",
+    cases:["Urban and peri-urban school broadband","Teacher device connectivity","STEM lab internet access"],
+    lon:-1.6, lat:6.7
+  },
+  {
+    id:"ftth-south-korea", layer:"last", name:"National Fiber (FTTH) School Program", location:"South Korea (National)",
+    tech:["Fiber to the school (FTTS)","GPON / 10G-EPON","KT / SKT / LG U+","100% school coverage"],
+    role:"South Korea achieved 100% fiber connectivity to all schools through a national FTTH program, delivering gigabit-grade symmetric speeds and enabling full digital education transformation.",
+    coverage:"All 11,000+ schools nationwide", cost:"Government-subsidized (near zero for schools)", costLevel:25,
+    strengths:"Gigabit speeds. Symmetric upload/download. Highly reliable. Enables full digital curriculum, cloud LMS, 4K video, AI learning tools.",
+    limitations:"Extremely expensive to replicate in LMICs. Required decades of infrastructure investment and national policy commitment.",
+    cases:["Full digital curriculum delivery","AI and STEM education","Cloud-based LMS","National EdTech platform"],
+    lon:127.5, lat:37.5
+  },
+  {
+    id:"starlink-peru", layer:"last", name:"Starlink LEO — Amazon Schools", location:"Loreto Region, Peru",
+    tech:["Starlink LEO satellite","Amazon riverine deployment","Solar + battery power","Community anchor school"],
+    role:"In Peru's Amazon, where rivers are highways and roads don't exist, Starlink has enabled remote indigenous schools to access the internet for the first time, paired with solar power systems.",
+    coverage:"Remote Amazon school / community", cost:"~$120–500/month + solar setup", costLevel:45,
+    strengths:"Only viable option in roadless Amazon. First-ever connectivity for many communities. Enables distance education and telemedicine.",
+    limitations:"Power reliability critical. Ongoing costs require subsidy. Community maintenance capacity low. Connectivity alone insufficient without devices and training.",
+    cases:["Indigenous school connectivity","Distance learning in Amazon","Telemedicine for remote clinics","Community emergency communications"],
+    lon:-75, lat:-5
+  },
+  {
+    id:"wifi-mesh-indonesia", layer:"last", name:"Community WiFi Mesh Network", location:"East Nusa Tenggara, Indonesia",
+    tech:["Long-range WiFi mesh (802.11ah)","Community network model","VSAT or microwave backhaul","Local operator"],
+    role:"Community-owned WiFi mesh networks in remote Indonesian islands use long-range WiFi to distribute connectivity from a single satellite or microwave backhaul point to multiple schools and households.",
+    coverage:"Village cluster / 3–5 km radius", cost:"Low (~$20–50/month shared community cost)", costLevel:18,
+    strengths:"Very low cost at point of use. Community ownership builds sustainability. One backhaul feeds multiple schools. Proven in Philippine and Indonesian island contexts.",
+    limitations:"Speed divided among users. Requires local tech champion to maintain. Backhaul quality determines experience. Weather can disrupt.",
+    cases:["Multi-school village connectivity","Community internet sharing","Digital literacy centers","Local content hosting"],
+    lon:122, lat:-9.5
+  },
+  {
+    id:"4g-rwanda", layer:"last", name:"4G/LTE School Connectivity (Connect Rwanda)", location:"Rwanda (National program)",
+    tech:["4G LTE FWA routers","MTN / Airtel Rwanda","Government subsidy","Tablet + router per school"],
+    role:"Rwanda's Connect Rwanda initiative connects all 3,000+ primary and secondary schools using 4G FWA routers subsidized by government, paired with tablet devices, achieving near-universal school connectivity.",
+    coverage:"3,000+ schools nationwide", cost:"Subsidized (~$30–80/month per school)", costLevel:28,
+    strengths:"Near-universal school coverage. Integrated with device provision. Monitoring dashboard. Government commitment and ISP partnership model replicable.",
+    limitations:"Bandwidth shared across classrooms. Speed varies in rural hills. Requires sustained government subsidy. Device maintenance challenging.",
+    cases:["Primary and secondary school LMS","Digital textbooks","Teacher professional development","National exam system"],
+    lon:30.1, lat:-1.7
+  },
+  {
+    id:"vsat-pacific-school", layer:"last", name:"VSAT School Connectivity", location:"Solomon Islands",
+    tech:["VSAT GEO satellite","Kacific / Intelsat","School dish antenna","150–300 Mbps shared beam"],
+    role:"Pacific island schools use VSAT GEO satellite connections where no terrestrial or LEO alternative is available, providing basic broadband despite high latency — acceptable for content download and async learning.",
+    coverage:"Remote island schools", cost:"Medium–high ($200–800/month)", costLevel:62,
+    strengths:"Reliable. Works in areas with no LEO terminal support yet. Suitable for content delivery and offline-first digital learning tools.",
+    limitations:"600ms+ latency makes video calls poor. Expensive. Shared beam capacity limited. Being superseded by LEO in many Pacific deployments.",
+    cases:["Offline content sync (Khan Academy, Wikipedia)","Basic school broadband","Government school reporting systems"],
+    lon:160, lat:-9.5
+  },
+];
+
+const layerVis = { backbone: true, middle: true, last: true };
+let activePoint = null;
+
+function toggleLayer(layer, el) {
+  layerVis[layer] = !layerVis[layer];
+  el.classList.toggle('dimmed', !layerVis[layer]);
+  document.querySelectorAll(`.point.${layer}`).forEach(p => {
+    p.style.display = layerVis[layer] ? '' : 'none';
+  });
+}
+
+function costColor(v) {
+  if (v >= 75) return '#E24B4A';
+  if (v >= 45) return '#EF9F27';
+  return '#1D9E75';
+}
+
+function layerLabel(l) {
+  return l === 'backbone' ? 'Backbone Layer' : l === 'middle' ? 'Middle Mile Layer' : 'Last Mile Layer';
+}
+
+function renderPoints() {
+  const g = document.getElementById('points-layer');
+  POINTS.forEach(pt => {
+    const { x, y } = proj(pt.lon, pt.lat);
+    const el = document.createElementNS('http://www.w3.org/2000/svg','g');
+    el.setAttribute('class', `point ${pt.layer}`);
+    el.setAttribute('transform', `translate(${x},${y})`);
+    el.innerHTML = `<circle class="ring" r="9"/><circle class="dot" r="5"/>`;
+    el.addEventListener('click', () => openPanel(pt, el));
+    el.addEventListener('mouseenter', e => showTooltip(e, pt));
+    el.addEventListener('mouseleave', hideTooltip);
+    g.appendChild(el);
+  });
+}
+
+function openPanel(pt, el) {
+  if (activePoint) activePoint.classList.remove('active');
+  activePoint = el;
+  el.classList.add('active');
+
+  const panel = document.getElementById('panel');
+  document.getElementById('p-layer').textContent = layerLabel(pt.layer);
+  document.getElementById('p-layer').className = `panel-layer ${pt.layer}`;
+  document.getElementById('p-title').textContent = pt.name;
+  document.getElementById('p-location').textContent = '📍 ' + pt.location;
+  const badge = document.getElementById('p-badge');
+  badge.textContent = pt.layer === 'backbone' ? 'Backbone' : pt.layer === 'middle' ? 'Middle mile' : 'Last mile';
+  badge.className = `panel-badge badge-${pt.layer}`;
+
+  const tags  = pt.tech.map(t => `<span class="tag">${t}</span>`).join('');
+  const cases = pt.cases.map(t => `<span class="tag">${t}</span>`).join('');
+  const bar   = pt.costLevel > 0 ? `<div class="cost-bar"><div class="cost-fill" style="width:${pt.costLevel}%;background:${costColor(pt.costLevel)}"></div></div>` : '';
+
+  document.getElementById('p-body').innerHTML = `
+    <div class="prow"><div class="prow-label">Role</div><div class="prow-value">${pt.role}</div></div>
+    <div class="prow"><div class="prow-label">Coverage</div><div class="prow-value">${pt.coverage}</div></div>
+    <div class="prow"><div class="prow-label">Cost</div><div class="prow-value">${pt.cost}${bar}</div></div>
+    <div class="prow"><div class="prow-label">Strengths</div><div class="prow-value">${pt.strengths}</div></div>
+    <div class="prow"><div class="prow-label">Limitations</div><div class="prow-value">${pt.limitations}</div></div>
+    <div class="prow"><div class="prow-label">Technologies</div><div class="tag-list">${tags}</div></div>
+    <div class="prow"><div class="prow-label">Use cases</div><div class="tag-list">${cases}</div></div>`;
+
+  panel.classList.add('open');
+}
+
+function closePanel() {
+  document.getElementById('panel').classList.remove('open');
+  if (activePoint) { activePoint.classList.remove('active'); activePoint = null; }
+}
+
+const tooltip = document.getElementById('tooltip');
+function showTooltip(e, pt) {
+  document.getElementById('tt-layer').textContent = layerLabel(pt.layer);
+  document.getElementById('tt-name').textContent = pt.name;
+  tooltip.style.display = 'block';
+  moveTooltip(e);
+}
+function moveTooltip(e) {
+  const wrap = document.querySelector('.map-wrap').getBoundingClientRect();
+  let tx = e.clientX - wrap.left + 14, ty = e.clientY - wrap.top - 36;
+  if (tx + 220 > wrap.width) tx = e.clientX - wrap.left - 220;
+  tooltip.style.left = tx + 'px';
+  tooltip.style.top  = ty + 'px';
+}
+function hideTooltip() { tooltip.style.display = 'none'; }
+document.querySelector('.map-wrap').addEventListener('mousemove', e => {
+  if (tooltip.style.display === 'block') moveTooltip(e);
+});
+
+renderPoints();
+</script>
+</body>
+</html>
